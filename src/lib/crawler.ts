@@ -3,9 +3,14 @@
  * Crawls Instagram Reels pages to extract video URLs and metadata.
  * Uses stealth techniques to avoid detection.
  */
-import { chromium, Browser, Page } from 'playwright';
+import { Browser, Page } from 'playwright';
+import { chromium } from 'playwright-extra';
+import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 import path from 'path';
 import fs from 'fs';
+
+// Apply stealth plugin to completely hide headless browser signatures from Instagram
+chromium.use(stealthPlugin());
 
 export interface VideoItem {
   source: 'instagram';
@@ -90,7 +95,7 @@ async function handleLogin(page: Page, log: (msg: string) => void): Promise<bool
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
-    
+
     // Attempt to dismiss "Allow all cookies" accept banner if deployed in EU-West regions
     try {
       const allowCookies = page.locator('button:has-text("Allow all cookies"), button:has-text("Accept")');
@@ -98,7 +103,7 @@ async function handleLogin(page: Page, log: (msg: string) => void): Promise<bool
         await allowCookies.first().click();
         await randomDelay(1000, 2000);
       }
-    } catch {}
+    } catch { }
 
     // Wait explicitly for the login form instead of failing silently instantly
     const usernameInput = page.locator('input[name="username"]');
@@ -236,7 +241,7 @@ async function crawlAccount(
 
           // Get view count and like count from aria labels and text
           const statsText = document.body.innerText;
-          
+
           // Parse views — look for patterns like "123,456 views" or "123K views"
           let views = 0;
           const viewsMatch = statsText.match(/([\d,.]+[KMB]?)\s*(?:views|plays)/i);
@@ -363,7 +368,7 @@ export async function crawlDirectLinks(
   if (urls.length === 0) return [];
 
   ensureDataDirs();
-  
+
   // Proactively check if we need to log in to generate cookies for yt-dlp
   if (!fs.existsSync(COOKIES_PATH)) {
     log('No saved cookies found. Forcing proactive Instagram login for direct links…');
