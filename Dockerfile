@@ -41,10 +41,6 @@ COPY . .
 # Build the Next.js app
 RUN npm run build
 
-# Add a volume directory specifically for Railway to mount persistent storage
-# This ensures downloaded files and cookies persist across deployments!
-VOLUME ["/app/data"]
-
 # Expose the default Next.js port
 EXPOSE 3000
 
