@@ -20,9 +20,10 @@ RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install Python packages (Whisper & yt-dlp)
-# We strictly install the CPU version of PyTorch first to prevent Whisper from downloading 4GB of NVIDIA CUDA drivers!
-RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-RUN pip install --no-cache-dir yt-dlp openai-whisper
+# Force CPU PyTorch with explicit index and clear out pip cache, deleting apt cache as well
+RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir yt-dlp openai-whisper && \
+    rm -rf /root/.cache/pip
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -30,12 +31,13 @@ WORKDIR /app
 # Copy dependency files first to utilize Docker layer caching
 COPY package.json package-lock.json ./
 
-# Install Node dependencies
-RUN npm install
+# Install Node dependencies and then immediately clear npm cache
+RUN npm install && npm cache clean --force
 
 # Install Playwright browser binaries (Chromium only, to save space)
 # We need the --with-deps flag to install missing linux system libraries for Chromium
-RUN npx playwright install chromium --with-deps
+RUN npx playwright install chromium --with-deps && \
+    rm -rf /root/.cache/ms-playwright/ffmpeg-* /root/.cache/ms-playwright/firefox-* /root/.cache/ms-playwright/webkit-*
 
 # Copy the rest of the application code
 COPY . .
