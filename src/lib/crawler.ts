@@ -87,19 +87,33 @@ async function handleLogin(page: Page, log: (msg: string) => void): Promise<bool
   try {
     // Try to navigate to login page
     await page.goto('https://www.instagram.com/accounts/login/', {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
-    await randomDelay(2000, 3000);
+    
+    // Attempt to dismiss "Allow all cookies" accept banner if deployed in EU-West regions
+    try {
+      const allowCookies = page.locator('button:has-text("Allow all cookies"), button:has-text("Accept")');
+      if (await allowCookies.count() > 0) {
+        await allowCookies.first().click();
+        await randomDelay(1000, 2000);
+      }
+    } catch {}
 
-    // Fill credentials
+    // Wait explicitly for the login form instead of failing silently instantly
     const usernameInput = page.locator('input[name="username"]');
-    const passwordInput = page.locator('input[name="password"]');
+    try {
+      await usernameInput.waitFor({ state: 'visible', timeout: 15000 });
+    } catch {
+      const title = await page.title();
+      log(`✗ Login form never appeared! Page Title: "${title}". Instagram might be blocking Railway's IP or showing a challenge.`);
+      return false;
+    }
 
     if (await usernameInput.isVisible()) {
       await usernameInput.fill(username);
       await randomDelay(500, 1000);
-      await passwordInput.fill(password);
+      await page.locator('input[name="password"]').fill(password);
       await randomDelay(500, 1000);
 
       // Submit
