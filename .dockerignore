@@ -1,0 +1,8 @@
+.git
+.next
+node_modules
+data/downloads
+data/test_transcript.txt
+test-drive-output.txt
+.env
+.env.local

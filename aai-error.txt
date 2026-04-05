@@ -1,0 +1,2 @@
+
+Message: "speech_models" must be a non-empty list containing one or more of: "universal-3-pro", "universal-2"
