@@ -29,7 +29,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install Node dependencies
-RUN npm ci
+RUN npm install
 
 # Install Playwright browser binaries (Chromium only, to save space)
 # We need the --with-deps flag to install missing linux system libraries for Chromium
