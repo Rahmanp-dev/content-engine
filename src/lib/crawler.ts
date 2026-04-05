@@ -36,13 +36,21 @@ function randomDelay(min = 1500, max = 3500): Promise<void> {
 }
 
 /**
- * Ensure data directories exist
+ * Ensure data directories exist and inject proxy cookies from env if present
  */
 function ensureDataDirs() {
   const dataDir = path.join(process.cwd(), 'data');
   const downloadsDir = path.join(dataDir, 'downloads');
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   if (!fs.existsSync(downloadsDir)) fs.mkdirSync(downloadsDir, { recursive: true });
+
+  // If user provided a raw cookie JSON array in their env vars, save it to bypass datacenter IP firewalls!
+  if (process.env.INSTAGRAM_COOKIES_JSON && !fs.existsSync(COOKIES_PATH)) {
+    try {
+      fs.writeFileSync(COOKIES_PATH, process.env.INSTAGRAM_COOKIES_JSON);
+      console.log('Successfully loaded cookies from environment variable INSTAGRAM_COOKIES_JSON');
+    } catch {}
+  }
 }
 
 /**
