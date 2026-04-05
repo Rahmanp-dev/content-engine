@@ -178,6 +178,19 @@ function downloadSingle(
       } else {
         const errMsg = (stderr.trim() || stdout.trim()).split('\n').pop() || '';
         log(`  ✗ yt-dlp error: ${errMsg.slice(0, 200)}`);
+        
+        // Auto-heal: If cookies are stale or anonymous and yt-dlp fails auth, explicitly delete them to force Playwright to re-login next run
+        if (errMsg.includes('login required') || errMsg.includes('rate-limit reached') || errMsg.includes('Use --cookies')) {
+          log(`  ! Detected invalid/stale cookies. Purging cookie files to force re-authentication next run.`);
+          try {
+            const dataDir = path.join(process.cwd(), 'data');
+            if (cookiesPath && fs.existsSync(cookiesPath)) fs.unlinkSync(cookiesPath);
+            if (fs.existsSync(path.join(dataDir, 'cookies.json'))) fs.unlinkSync(path.join(dataDir, 'cookies.json'));
+          } catch {
+            // ignore
+          }
+        }
+        
         resolve(null);
       }
     });

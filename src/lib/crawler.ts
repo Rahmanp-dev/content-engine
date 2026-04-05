@@ -305,6 +305,15 @@ export async function crawl(
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
+    // Proactively check if we need to log in before crawling
+    if (!fs.existsSync(COOKIES_PATH)) {
+      log('No saved cookies found. Forcing proactive Instagram login…');
+      const authContext = await browser.newContext();
+      const authPage = await authContext.newPage();
+      await handleLogin(authPage, log);
+      await authContext.close();
+    }
+
     const perAccountLimit = Math.ceil(config.limit / Math.max(config.accounts.length, 1));
 
     for (const account of config.accounts) {
@@ -340,6 +349,24 @@ export async function crawlDirectLinks(
   if (urls.length === 0) return [];
 
   ensureDataDirs();
+  
+  // Proactively check if we need to log in to generate cookies for yt-dlp
+  if (!fs.existsSync(COOKIES_PATH)) {
+    log('No saved cookies found. Forcing proactive Instagram login for direct links…');
+    try {
+      const browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+      const authContext = await browser.newContext();
+      const authPage = await authContext.newPage();
+      await handleLogin(authPage, log);
+      await browser.close();
+    } catch (e) {
+      log(`Failed proactive login check: ${(e as Error).message}`);
+    }
+  }
+
   const results: VideoItem[] = [];
 
   for (let i = 0; i < urls.length; i++) {
