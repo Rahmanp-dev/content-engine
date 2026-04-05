@@ -150,7 +150,7 @@ function downloadSingle(
       stderr += data.toString();
     });
 
-    proc.on('close', (code) => {
+    proc.on('close', async (code) => {
       if (code === 0) {
         // Find the downloaded file — look for our prefix in the directory
         const files = fs.readdirSync(downloadDir)
@@ -177,20 +177,49 @@ function downloadSingle(
         }
       } else {
         const errMsg = (stderr.trim() || stdout.trim()).split('\n').pop() || '';
-        log(`  ✗ yt-dlp error: ${errMsg.slice(0, 200)}`);
+        log(`  ✗ yt-dlp native block detected. Handing off to Cobalt API fallback proxy…`);
         
-        // Auto-heal: If cookies are stale or anonymous and yt-dlp fails auth, explicitly delete them to force Playwright to re-login next run
+        // Auto-heal cookies
         if (errMsg.includes('login required') || errMsg.includes('rate-limit reached') || errMsg.includes('Use --cookies')) {
-          log(`  ! Detected invalid/stale cookies. Purging cookie files to force re-authentication next run.`);
           try {
             const dataDir = path.join(process.cwd(), 'data');
             if (cookiesPath && fs.existsSync(cookiesPath)) fs.unlinkSync(cookiesPath);
             if (fs.existsSync(path.join(dataDir, 'cookies.json'))) fs.unlinkSync(path.join(dataDir, 'cookies.json'));
-          } catch {
-            // ignore
-          }
+          } catch {}
         }
         
+        // Fallback to Cobalt API (Free, open-source downloader that bypasses IP blocks)
+        try {
+          const cobaltResponse = await fetch('https://api.cobalt.tools/api/json', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: url,
+              vQuality: '720'
+            })
+          });
+
+          const cobaltData = await cobaltResponse.json();
+          if (cobaltData && cobaltData.url) {
+            log(`  ✓ Cobalt API success! Downloading file stream…`);
+            
+            // Download the direct file stream provided by Cobalt
+            const streamRes = await fetch(cobaltData.url);
+            const arrayBuffer = await streamRes.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            
+            fs.writeFileSync(desiredPath, buffer);
+            log(`  ✓ Fallback download successful (Cobalt)`);
+            resolve(desiredPath);
+            return;
+          }
+        } catch (fallErr) {
+          log(`  ✗ Cobalt fallback also failed: ${(fallErr as Error).message}`);
+        }
+
         resolve(null);
       }
     });
