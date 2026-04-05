@@ -20,6 +20,8 @@ RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install Python packages (Whisper & yt-dlp)
+# We strictly install the CPU version of PyTorch first to prevent Whisper from downloading 4GB of NVIDIA CUDA drivers!
+RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir yt-dlp openai-whisper
 
 # Set the working directory inside the container
