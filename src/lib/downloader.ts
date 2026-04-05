@@ -188,36 +188,51 @@ function downloadSingle(
           } catch {}
         }
         
-        // Fallback to Cobalt API (Free, open-source downloader that bypasses IP blocks)
+        // Fallback to Native Stealth Browser Extraction (since Instagram kills datacenters for third-party APIs)
         try {
-          const cobaltResponse = await fetch('https://api.cobalt.tools/api/json', {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              url: url,
-              vQuality: '720'
-            })
+          const { chromium } = require('playwright-extra');
+          const stealthPlugin = require('puppeteer-extra-plugin-stealth');
+          chromium.use(stealthPlugin());
+
+          log(`  * Booting stealth fallback extractor…`);
+          const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+          const context = await browser.newContext();
+          
+          if (cookiesPath) {
+            try {
+              const dataDir = path.join(process.cwd(), 'data');
+              const raw = fs.readFileSync(path.join(dataDir, 'cookies.json'), 'utf-8');
+              const cookieArr = JSON.parse(raw);
+              await context.addCookies(cookieArr);
+            } catch {}
+          }
+
+          const page = await context.newPage();
+          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+          
+          // Wait for video element
+          try { await page.waitForSelector('video', { timeout: 10000 }); } catch {}
+
+          const rawVideoUrl = await page.evaluate(() => {
+            const videoEl = document.querySelector('video');
+            return videoEl?.src || videoEl?.querySelector('source')?.src || '';
           });
 
-          const cobaltData = await cobaltResponse.json();
-          if (cobaltData && cobaltData.url) {
-            log(`  ✓ Cobalt API success! Downloading file stream…`);
-            
-            // Download the direct file stream provided by Cobalt
-            const streamRes = await fetch(cobaltData.url);
+          await browser.close();
+
+          if (rawVideoUrl) {
+            log(`  ✓ Native extraction success! Downloading raw CDN stream…`);
+            const streamRes = await fetch(rawVideoUrl);
             const arrayBuffer = await streamRes.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            
-            fs.writeFileSync(desiredPath, buffer);
-            log(`  ✓ Fallback download successful (Cobalt)`);
+            fs.writeFileSync(desiredPath, Buffer.from(arrayBuffer));
+            log(`  ✓ Fallback download successful (Playwright)`);
             resolve(desiredPath);
             return;
+          } else {
+            log(`  ✗ Native extraction failed: NO HTML5 Video player found on page.`);
           }
         } catch (fallErr) {
-          log(`  ✗ Cobalt fallback also failed: ${(fallErr as Error).message}`);
+          log(`  ✗ Playwright fallback failed: ${(fallErr as Error).message}`);
         }
 
         resolve(null);
