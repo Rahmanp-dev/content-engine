@@ -9,7 +9,7 @@
 import { crawl, crawlDirectLinks, type VideoItem } from './crawler';
 import { download, type DownloadedItem } from './downloader';
 import { transcribe, type TranscriptItem } from './transcriber';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateContentWithRetry } from './gemini';
 import connectToDatabase from './mongodb';
 import RunHistory from '@/models/RunHistory';
 
@@ -122,10 +122,7 @@ ${block}
 Be specific. Reference actual examples from the transcripts by video number. This analysis is the foundation for generating new original content.`;
 
   log('info', 'Sending transcripts to Gemini for analysis…');
-  const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const result = await model.generateContent(prompt);
-  const analysis = result.response.text();
+  const analysis = await generateContentWithRetry({ apiKey: key, prompt, log });
 
   if (!analysis) throw new Error('Gemini returned no analysis');
   return analysis;
@@ -176,10 +173,7 @@ Why It Wins: [Which gap or emotional trigger from the analysis this addresses �
 Separate every concept with === on its own line. Do not add any text before the first === or after the last ===.`;
 
   log('info', `Generating ${conceptCount} original video concepts via Gemini…`);
-  const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const result = await model.generateContent(prompt);
-  const raw = result.response.text();
+  const raw = await generateContentWithRetry({ apiKey: key, prompt, log });
 
   if (!raw) throw new Error('Gemini returned no concepts');
 

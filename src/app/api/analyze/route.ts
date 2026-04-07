@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateContentWithRetry } from '@/lib/gemini';
 import { apiError, requireEnv, parseBody, corsHeaders, EnvMissingError } from '@/lib/api-helpers';
 
 interface Transcript {
@@ -52,11 +52,7 @@ ${block}
 
 Be specific. Reference actual examples from the transcripts by video number. This analysis is the foundation for generating new original content.`;
 
-    const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    
-    const result = await model.generateContent(prompt);
-    const analysis = result.response.text();
+    const analysis = await generateContentWithRetry({ apiKey: key, prompt });
 
     if (!analysis) return apiError('Gemini returned no analysis', 500);
 

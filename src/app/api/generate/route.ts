@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateContentWithRetry } from '@/lib/gemini';
 import { apiError, requireEnv, parseBody, corsHeaders, EnvMissingError } from '@/lib/api-helpers';
 import connectToDatabase from '@/lib/mongodb';
 import RunHistory from '@/models/RunHistory';
@@ -39,11 +39,7 @@ Why It Wins: [Which gap or emotional trigger from the analysis this addresses â€
 
 Separate every concept with === on its own line. Do not add any text before the first === or after the last ===.`;
 
-    const genAI = new GoogleGenerativeAI(key);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text();
+    const raw = await generateContentWithRetry({ apiKey: key, prompt });
 
     if (!raw) return apiError('Gemini returned no concepts', 500);
 
